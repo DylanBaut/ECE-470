@@ -48,6 +48,7 @@ Q33 = [207.16*pi/180.0, -54.94*pi/180.0, 117.96*pi/180.0, -152.78*pi/180.0, -89.
 
 
 thetas = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+gripper_in = 1
 
 digital_in_0 = 0
 analog_in_0 = 0
@@ -77,6 +78,8 @@ TODO: define a ROS topic callback funtion for getting the state of suction cup
 Whenever ur3/gripper_input publishes info this callback function is called.
 """
 def gripper_callback(msg):
+    global gripper_in
+    gripper_in =msg.AIN0
     pass
 
 
@@ -203,6 +206,8 @@ def move_arm(pub_cmd, loop_rate, dest, vel, accel):
 def move_block(pub_cmd, loop_rate, start_loc, start_height, \
                end_loc, end_height):
     global Q
+    error = 0
+    success = 1
     start_dest = Q[start_loc][start_height]
     end_dest=  Q[end_loc][end_height]
 
@@ -214,7 +219,9 @@ def move_block(pub_cmd, loop_rate, start_loc, start_height, \
     # Delay to make sure suction cup has grasped the block
     time.sleep(1.0)
     move_arm(pub_cmd, loop_rate, Q[start_loc][0], 4.0, 4.0)
-
+    if gripper_in < 1.95:
+        gripper(pub_cmd, loop_rate, suction_off)
+        return error
 
     #move above end tower
     move_arm(pub_cmd, loop_rate, Q[end_loc][0], 4.0, 4.0)
@@ -225,9 +232,8 @@ def move_block(pub_cmd, loop_rate, start_loc, start_height, \
     time.sleep(1.0)
     move_arm(pub_cmd, loop_rate, Q[end_loc][0], 4.0, 4.0)
 
-    error = 0
 
-    return error
+    return success
 
 
 ############### Your Code End Here ###############
@@ -251,6 +257,8 @@ def main():
 
     ############## Your Code Start Here ##############
     # TODO: define a ROS subscriber for ur3/gripper_input message and corresponding callback function
+    
+    sub_gripper = rospy.Subscriber('ur3/gripper_input', gripper_input, gripper_callback)
 
 
     ############### Your Code End Here ###############
@@ -308,13 +316,27 @@ def main():
     # TODO: modify the code so that UR3 can move tower accordingly from user input
 
         
-    move_block(pub_command, loop_rate, start_tower, 1, end_tower, 3)
-    move_block(pub_command, loop_rate, start_tower, 2, mid_tower, 3)
-    move_block(pub_command, loop_rate, end_tower, 3, mid_tower, 2)
-    move_block(pub_command, loop_rate, start_tower, 3, end_tower, 3)
-    move_block(pub_command, loop_rate, mid_tower, 2, start_tower, 3)
-    move_block(pub_command, loop_rate, mid_tower, 3, end_tower, 2)
-    move_block(pub_command, loop_rate, start_tower, 3, end_tower, 1)
+    if (not move_block(pub_command, loop_rate, start_tower, 1, end_tower, 3)):
+        print("ERROR: BLOCK NOT FOUND!")
+        return 0
+    if (not move_block(pub_command, loop_rate, start_tower, 2, mid_tower, 3)):
+        print("ERROR: BLOCK NOT FOUND!")
+        return 0
+    if (not move_block(pub_command, loop_rate, end_tower, 3, mid_tower, 2)):
+        print("ERROR: BLOCK NOT FOUND!")
+        return 0
+    if (not move_block(pub_command, loop_rate, start_tower, 3, end_tower, 3)):
+        print("ERROR: BLOCK NOT FOUND!")
+        return 0
+    if (not move_block(pub_command, loop_rate, mid_tower, 2, start_tower, 3)):
+        print("ERROR: BLOCK NOT FOUND!")
+        return 0
+    if (not move_block(pub_command, loop_rate, mid_tower, 3, end_tower, 2)):
+        print("ERROR: BLOCK NOT FOUND!")
+        return 0
+    if (not move_block(pub_command, loop_rate, start_tower, 3, end_tower, 1)):
+        print("ERROR: BLOCK NOT FOUND!")
+        return 0
 
     
     # while(loop_count > 0):
