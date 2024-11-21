@@ -15,7 +15,7 @@ ty = 0.0
 def IMG2W(col, row):
     Beta = 760
     theta = 1.508*np.pi/180
-    Ty =.09
+    Ty =.08
     Tx =.300
 
     Or= 239
@@ -45,18 +45,18 @@ def blob_search(image_raw, color):
 
     # Filter by Area.
     params.filterByArea = True
-    params.minArea = 500
-    params.maxArea = 3000
+    params.minArea = 250
+    params.maxArea = 1000
     # Filter by Circularity
     params.filterByCircularity = False
 
     
     # Filter by Inerita
     params.filterByInertia = False
-
+    # params.minInertiaRatio = .9
     # Filter by Convexity
-    params.filterByConvexity = True
-    params.minConvexity = 0.9
+    params.filterByConvexity =False
+    # params.minConvexity = 0.9
 
     # ========================= Student's code ends here ===========================
 
@@ -75,10 +75,10 @@ def blob_search(image_raw, color):
 
 
     if(color == 'green'):
-        lowerhsl =(40,70,70)
-        upperhsl =(60,255,255)
+        lowerhsl =(32,75,75)
+        upperhsl =(80,255,255)
     elif(color == 'yellow'):
-        lowerhsl =(20,102,102)
+        lowerhsl =(15,75,75)
         upperhsl =(30,255,255)
     
 
@@ -99,7 +99,7 @@ def blob_search(image_raw, color):
 
     # Draw the keypoints on the detected block
     # print("KEYPOINTS", keypoints)
-    im_with_keypoints = cv2.drawKeypoints(image_raw, keypoints ,np.array([]),flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)# (0, 255, 0), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    im_with_keypoints = cv2.drawKeypoints(image_raw, keypoints ,np.array([]),(0, 255, 0),flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)# , cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
 
     # ========================= Student's code ends here ===========================
 
