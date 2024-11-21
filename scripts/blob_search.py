@@ -45,15 +45,18 @@ def blob_search(image_raw, color):
 
     # Filter by Area.
     params.filterByArea = True
-
+    params.minArea = 500
+    params.maxArea = 3000
     # Filter by Circularity
     params.filterByCircularity = False
 
+    
     # Filter by Inerita
     params.filterByInertia = False
 
     # Filter by Convexity
-    params.filterByConvexity = False
+    params.filterByConvexity = True
+    params.minConvexity = 0.9
 
     # ========================= Student's code ends here ===========================
 
@@ -96,7 +99,7 @@ def blob_search(image_raw, color):
 
     # Draw the keypoints on the detected block
     # print("KEYPOINTS", keypoints)
-    im_with_keypoints = cv2.drawKeypoints(image_raw, keypoints ,np.array([]),cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)# (0, 255, 0), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    im_with_keypoints = cv2.drawKeypoints(image_raw, keypoints ,np.array([]),flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)# (0, 255, 0), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
 
     # ========================= Student's code ends here ===========================
 

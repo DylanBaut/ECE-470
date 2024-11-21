@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+# !/usr/bin/env python
 
 import sys
 import copy
@@ -197,12 +197,21 @@ def move_block(pub_cmd, loop_rate, start_xw_yw_zw, target_xw_yw_zw, vel, accel):
 
     # global variable1
     # global variable2
-    start_theta = lab_invk(start_xw_yw_zw[0],start_xw_yw_zw[1],.031,0)
-    target_theta = lab_invk(target_xw_yw_zw[0],target_xw_yw_zw[1],.035,0)
-    move_arm(pub_cmd, loop_rate, start_theta, vel, accel) #move above block
-    # move_arm(pub_cmd, loop_rate, , vel, accel) #move to block
-    gripper(pub_cmd, loop_rate, suction_on)              #suction on
+    zval = .035
+    while(zval >= .03):
+        start_theta = lab_invk(start_xw_yw_zw[0],start_xw_yw_zw[1],zval,0)
+        move_arm(pub_cmd, loop_rate, start_theta, vel, accel) #move above block
+        # move_arm(pub_cmd, loop_rate, , vel, accel) #move to block
+        if(digital_in_0):
+            gripper(pub_cmd, loop_rate, suction_on)#suction on
+            break
+        else:
+            zval -=.01
+        if(zval == .03):
+            error = 1
+            return error
 
+    target_theta = lab_invk(target_xw_yw_zw[0],target_xw_yw_zw[1],.035,0)
     move_arm(pub_cmd, loop_rate, target_theta, vel, accel) #move above destination
     # move_arm(pub_cmd, loop_rate, , vel, accel) #move to destination
     gripper(pub_cmd, loop_rate, suction_off)               #suction off
@@ -262,8 +271,9 @@ Program run from here
 def main():
 
     global go_away
-    global xw_yw_R
+    global xw_yw_Y
     global xw_yw_G
+    global xw_yw_R
 
     # global variable1
     # global variable2
@@ -302,10 +312,13 @@ def main():
     print(xw_yw_G)
     i = 0
     xw_yw_all = xw_yw_G
-    for xy in xw_yw_all:
-        move_block(pub_command,loop_rate,xy,(.22,.22+i),vel,accel)
-        i += .03
-
+    if(len(xw_yw_Y) > 0 or len(xw_yw_G) > 0):
+        for xy in xw_yw_all:
+            retval = move_block(pub_command,loop_rate,xy,(.22,.22+i),vel,accel)
+            if(retval): 
+                print("ERROR: BLOCK NOT FOUND!")
+                return 0
+            i += .03
     # ========================= Student's code ends here ===========================
 
     move_arm(pub_command, loop_rate, go_away, vel, accel)
