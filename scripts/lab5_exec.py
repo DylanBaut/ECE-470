@@ -1,4 +1,4 @@
-# !/usr/bin/env python
+#!/usr/bin/env python
 
 import sys
 import copy
@@ -57,6 +57,8 @@ Whenever ur3/gripper_input publishes info this callback function is called.
 def input_callback(msg):
 
     global digital_in_0
+    global gripper_in
+    gripper_in = msg.AIN0
     digital_in_0 = msg.DIGIN
     digital_in_0 = digital_in_0 & 1 # Only look at least significant bit, meaning index 0
 
@@ -197,25 +199,27 @@ def move_block(pub_cmd, loop_rate, start_xw_yw_zw, target_xw_yw_zw, vel, accel):
 
     # global variable1
     # global variable2
-    zval = .035
-    while(zval >= .03):
-        start_theta = lab_invk(start_xw_yw_zw[0],start_xw_yw_zw[1],zval,0)
-        move_arm(pub_cmd, loop_rate, start_theta, vel, accel) #move above block
-        # move_arm(pub_cmd, loop_rate, , vel, accel) #move to block
-        if(digital_in_0):
-            gripper(pub_cmd, loop_rate, suction_on)#suction on
-            break
-        else:
-            zval -=.01
-        if(zval == .03):
-            error = 1
-            return error
+    zval = .03
+    # print("start loop")
+    start_theta = lab_invk(start_xw_yw_zw[0],start_xw_yw_zw[1],zval+.05,0)
+    move_arm(pub_cmd, loop_rate, start_theta, vel, accel) #move above block
+    start_theta2 = lab_invk(start_xw_yw_zw[0],start_xw_yw_zw[1],zval,0)
+    time.sleep(.1)
+    move_arm(pub_cmd, loop_rate, start_theta2, vel, accel) #move above block
+    gripper(pub_cmd, loop_rate, suction_on)#suction on
 
-    target_theta = lab_invk(target_xw_yw_zw[0],target_xw_yw_zw[1],.035,0)
+    nextset = lab_invk(start_xw_yw_zw[0],start_xw_yw_zw[1],zval+.05,0)
+    time.sleep(.2)
+    
+    move_arm(pub_cmd, loop_rate, nextset, vel, accel) #move above block
+    time.sleep(.1)
+    target_theta = lab_invk(target_xw_yw_zw[0],target_xw_yw_zw[1],zval,0)
     move_arm(pub_cmd, loop_rate, target_theta, vel, accel) #move above destination
     # move_arm(pub_cmd, loop_rate, , vel, accel) #move to destination
+    time.sleep(.2)
     gripper(pub_cmd, loop_rate, suction_off)               #suction off
-
+    nextset = lab_invk(start_xw_yw_zw[0],start_xw_yw_zw[1],zval+.05,0)
+    move_arm(pub_cmd, loop_rate, nextset, vel, accel) #move above block
     error = 0
 
     # ========================= Student's code ends here ===========================
@@ -311,14 +315,34 @@ def main():
     """
     print(xw_yw_G)
     i = 0
-    xw_yw_all = xw_yw_G
-    if(len(xw_yw_Y) > 0 or len(xw_yw_G) > 0):
-        for xy in xw_yw_all:
-            retval = move_block(pub_command,loop_rate,xy,(.22,.22+i),vel,accel)
+    retval = 0
+    if( len(xw_yw_G) > 0):
+        for xy in xw_yw_G:
+            retval = move_block(pub_command,loop_rate,xy,(.24,.25+i),vel,accel)
+            
             if(retval): 
                 print("ERROR: BLOCK NOT FOUND!")
                 return 0
-            i += .03
+            i += .13
+    else:
+        print("ERROR: BLOCK NOT FOUND!")
+        move_arm(pub_command, loop_rate, go_away, vel, accel)
+    i = 0 
+    if( len(xw_yw_Y) > 0):
+        for xy in xw_yw_Y:
+            retval = move_block(pub_command,loop_rate,xy,(.14,.25+i),vel,accel)
+            if(retval): 
+                print("ERROR: BLOCK NOT FOUND!")
+                move_arm(pub_command, loop_rate, go_away, vel, accel)
+                print("Use Ctrl+C to exit program")
+                rospy.spin()
+                return 0
+            i += .13
+    else:
+        print("ERROR: BLOCK NOT FOUND!")
+        return 0
+
+    
     # ========================= Student's code ends here ===========================
 
     move_arm(pub_command, loop_rate, go_away, vel, accel)
