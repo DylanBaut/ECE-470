@@ -165,148 +165,33 @@ def move_arm(pub_cmd, loop_rate, dest, vel, accel, move_type):
 ################ Pre-defined parameters and functions above (can change if needed) ################
 
 ##========= TODO: Helper Functions =========##
-
-def find_keypoints(image):
-    """Gets keypoints from the given image
-
-    Parameters
-    ----------
-    image : np.ndarray
-        The given image (before or after preprocessing)
-
-    Returns
-    -------
-    keypoints
-        a list of keypoints detected in image coordinates
-  `  """
-    # Convert to grayscale if needed
-    if len(image.shape) == 3:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    else:
-        gray = image.copy()
+def sort_points_for_drawing(points):
+    """Sort points efficiently using NumPy vectorization."""
     
-    # Threshold to get black lines
-    _, binary = cv2.threshold(gray, 128, 255, cv2.THRESH_BINARY)
     
-    # Create a copy for visualization
-    vis_image = cv2.cvtColor(binary, cv2.COLOR_GRAY2BGR)
+    points = np.asarray(points)
+    n_points = len(points)
     
-    # Get distance transform
-    dist = cv2.distanceTransform(binary, cv2.DIST_L2, 3)
+    sorted_indices = np.zeros(n_points, dtype=np.int32)
+    mask = np.ones(n_points, dtype=bool)
     
-    # Threshold distance transform to get ridges (centerlines)
-    _, ridges = cv2.threshold(dist, 1, 255, cv2.THRESH_BINARY)
-    ridges = ridges.astype(np.uint8)
+    start_idx = np.argmin(points[:, 0])
+    current_idx = start_idx
+    sorted_indices[0] = start_idx
+    mask[start_idx] = False
     
-    # Find contours of the ridges
-    contours, _ = cv2.findContours(ridges, cv2.RETR_LIST, 
-                                 cv2.CHAIN_APPROX_NONE)
-    
-    keypoints = []
-    min_contour_length = 30
-    
-    for contour in contours:
-        if len(contour) < min_contour_length:
-            continue
-            
-        # Approximate the contour to get main points
-        epsilon = 0.01 * cv2.arcLength(contour, True)
-        approx = cv2.approxPolyDP(contour, epsilon, False)
+    for i in range(1, n_points):
+        current = points[current_idx]
         
-        # Get points with consistent spacing
-        for i in range(len(approx) - 1):
-            p1 = tuple(approx[i][0])
-            p2 = tuple(approx[i + 1][0])
-            
-            # Calculate distance between points
-            dx = p2[0] - p1[0]
-            dy = p2[1] - p1[1]
-            dist = np.sqrt(dx*dx + dy*dy)
-            
-            # Add points with fixed spacing
-            if dist > 20:
-                steps = int(dist / 20)
-                for j in range(steps + 1):
-                    t = j / steps
-                    x = int(p1[0] + dx * t)
-                    y = int(p1[1] + dy * t)
-                    keypoints.append((x, y))
-            else:
-                keypoints.append(p1)
-                
-        # Add last point
-        if len(approx) > 0:
-            keypoints.append(tuple(approx[-1][0]))
+        distances = np.sum((points[mask] - current) ** 2, axis=1)
+        
+        next_idx = np.where(mask)[0][np.argmin(distances)]        
+        sorted_indices[i] = next_idx
+        mask[next_idx] = False
+        current_idx = next_idx
     
-    # Remove duplicates while maintaining order
-    keypoints = list(dict.fromkeys(keypoints))
-    
-    # Draw debug visualizations
-    debug_image = image.copy()
-    if len(debug_image.shape) == 2:
-        debug_image = cv2.cvtColor(debug_image, cv2.COLOR_GRAY2BGR)
-    
-    # Draw ridges
-    ridge_image = debug_image.copy()
-    cv2.drawContours(ridge_image, contours, -1, (0, 255, 0), 1)
-    
-    # Draw keypoints and connecting lines
-    keypoint_image = debug_image.copy()
-    
-    # # Draw lines between consecutive points
-    # for i in range(len(keypoints) - 1):
-    #     pt1 = keypoints[i]
-    #     pt2 = keypoints[i + 1]
-    #     cv2.line(keypoint_image, pt1, pt2, (0, 255, 0), 1)
-    
-    # Draw keypoints
-    for x, y in keypoints:
-        cv2.circle(keypoint_image, (x, y), 2, (0, 0, 255), -1)
-    
-    # Save debug images
-    cv2.imwrite('debug_1_binary.png', binary)
-    cv2.imwrite('debug_2_ridges.png', ridges)
-    cv2.imwrite('debug_3_centerlines.png', ridge_image)
-    cv2.imwrite('debug_4_keypoints.png', keypoint_image)
-
-    
-    return keypoints
-
-def IMG2W(row, col, image):
-    """Transform image coordinates to world coordinates
-
-    Parameters
-    ----------
-    row : int
-        Pixel row position
-    col : int
-        Pixel column position
-    image : np.ndarray
-        The given image (before or after preprocessing)
-
-    Returns
-    -------
-    x : float
-        x position in the world frame
-    y : float
-        y position in the world frame
-    """
-    
-    
-    
-    x, y = 0.0, 0.0
-    return x, y
-
-def draw_image(world_keypoints):
-    """Draw the image based on detecte keypoints in world coordinates
-
-    Parameters
-    ----------
-    world_keypoints:
-        a list of keypoints detected in world coordinates
-    """
-    pass
-
+    # Return sorted points as tuples
+    return [tuple(map(int, p)) for p in points[sorted_indices]]
 
 def find_keypoints2(image):
     """Gets keypoints along center of lines with reduced density
@@ -317,77 +202,111 @@ def find_keypoints2(image):
         The given image (before or after preprocessing)
     """
     # Convert to grayscale if needed
-    if len(image.shape) == 3:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    else:
-        gray = image.copy()
-    cv2.imwrite("2gray.png",gray)
-    filtered = gray
-    filtered = cv2.bilateralFilter(gray,5,100,9)
+    resized_image = cv2.resize(image, (319*2,239*2), interpolation=cv2.INTER_AREA)
+    gray = cv2.cvtColor(resized_image, cv2.COLOR_BGR2GRAY)
+
     # Threshold to ensure clean binary image
-    # _, binary = cv2.threshold(gray, 120, 255, cv2.THRESH_BINARY)
-    binary = cv2.adaptiveThreshold(filtered,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C ,cv2.THRESH_BINARY,11,-4)
-    
-    # Fill in the lines to get solid regions
-    kernel = np.ones((3,3), np.uint8)
-    filled = cv2.morphologyEx(binary, cv2.MORPH_CLOSE,kernel)
-    
-    # Get the distance transform
-    dist = cv2.distanceTransform(filled, cv2.DIST_L2, 5)
+    # _, binary = cv2.threshold(gray, 128, 255, cv2.THRESH_BINARY)
+    binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 3, -5)
     
     # Threshold the distance transform to get center line
-    _, center = cv2.threshold(dist, 1, 255, cv2.THRESH_BINARY_INV)
+    _, center = cv2.threshold(binary, 1, 255, cv2.THRESH_BINARY)
     center = center.astype(np.uint8)
-    
+    canny = cv2.Canny(center,1,255)
+    crosskernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(5,5))
+    fill = cv2.dilate(canny,crosskernel,iterations = 3)
     # Find contours of the center line
-    contours, _ = cv2.findContours(binary, cv2.RETR_LIST, 
-                                 cv2.CHAIN_APPROX_TC89_L1)
+    contours, _ = cv2.findContours(canny, cv2.RETR_LIST, 
+                                 cv2.CHAIN_APPROX_TC89_KCOS)
+    height, width = center.shape[:2]
     
     # Process contours to get keypoints
     keypoints = []
-    min_length = 10  # Increased minimum length
-    spacing = 20     # Increased spacing between points
-    
+    keypoints2 = np.array([])
+    min_length = 0  # Increased minimum length
+    spacing = 60  # Increased spacing between points
     for contour in contours:
         if len(contour) < min_length:
             continue
-            
-        # Use contour approximation to reduce points
-        epsilon = 0.02 * cv2.arcLength(contour, True)
-        approx = cv2.approxPolyDP(contour, epsilon, False)
-        
-        # Sample points with larger spacing
+        epsilon = 0.0001 * cv2.arcLength(contour, True)
+        approx = cv2.approxPolyDP(contour, epsilon, True)     
+        # keypoints2.append(approx.reshape(-1,2))   
+        print(len(approx))
         for i in range(0, len(approx), spacing):
-            point = approx[i][0]
+            # point = approx[i][0]
+            point = contour[i][0]
+            # keypoints.append(tuple(point))
             keypoints.append(tuple(point))
-    ridge_image = image.copy()
-    cv2.drawContours(ridge_image, contours, -1, (0, 255, 0), 1)
-
+    print(len(keypoints))
     # Create debug images
+    height, width = resized_image.shape[:2]
+    recreated_image = np.ones((height, width, 3), dtype=np.uint8) * 255  # White background
+    # Draw lines connecting keypoints
+    if len(keypoints) > 1:
+        for i in range(0, len(keypoints) - 1):  # Changed to -1 to avoid going past end
+            start_point = keypoints[i]
+            end_point = keypoints[i + 1]
+            cv2.line(recreated_image, start_point, end_point, (0, 0, 255), 1)
     debug_image = image.copy()
     if len(debug_image.shape) == 2:
         debug_image = cv2.cvtColor(debug_image, cv2.COLOR_GRAY2BGR)
     
     # Draw keypoints
     keypoint_image = debug_image.copy()
-    for x, y in keypoints:
+    finalkeypoints = sort_points_for_drawing(keypoints)
+    
+    for x, y in finalkeypoints:
         cv2.circle(keypoint_image, (x, y), 3, (0, 0, 255), -1)
-        
     # Save debug images
+    cv2.drawContours(recreated_image, contours, -1, (0,255,0), 3)
+    cv2.imwrite('2debug_6_fill.png',fill)
+    cv2.imwrite('2debug_5_cany.png',canny)
+    cv2.imwrite('2debug_4_draw.png', recreated_image)
     cv2.imwrite('2debug_1_binary.png', binary)
-    cv2.imwrite('2debug_1_bilateral.png', filtered)
-    cv2.imwrite('2debug_2_contours.png', ridge_image)
-    cv2.imwrite('2debug_2_filled.png', filled)
-    cv2.imwrite('2debug_3_center.png', center)
-    cv2.imwrite('2debug_4_keypoints.png', keypoint_image)
-    return keypoints
-"""
-Program run from here
-"""
+    cv2.imwrite('2debug_2_center.png',center)
+    cv2.imwrite('2debug_3_keypoints.png', keypoint_image)
+    cv2.imwrite('2debug_7_keypoints.png', resized_image)
+    
+    return finalkeypoints
+
+def IMG2W(col, row):
+    # Beta = 760
+    # theta = 1.508*np.pi/180
+    # Ty =.08
+    # Tx =.300
+
+    Or= 239
+    Oc = 319
+    xc = (row)/(Or*2)*.21+0.17
+    yc=  (col)/(Oc*2)*.28+0.025
+    # print("XC,YC: ",xc,yc, "\n \n \n")
+    # xw = (xc+Tx)*np.cos(theta)-(yc+Ty)*np.sin(theta)
+    # yw = (xc+Tx)*np.sin(theta)+(yc+Ty)*np.cos(theta)
+    # # print("World Coordinates:",xw,",",yw)
+    return(xc,yc)
+
+def draw_image(world_keypoints):
+    """Draw the image based on detecte keypoints in world coordinates
+
+    Parameters
+    ----------
+    world_keypoints:
+        a list of keypoints detected in world coordinates
+    """
+    draw_keypoints = [IMG2W(i[0],i[1]) for i in world_keypoints]
+    t = len(draw_keypoints)
+    for point  in draw_keypoints:
+        t -= 1
+        angles = lab_invk(point[0],point[1],0.03,90)
+        move_arm(pub_command, loop_rate, angles, 3.0, 2.0, 'L')
+        print(t," Points left")
+    return
+
+
 def main():
     global home
-    # global variable1
-    # global variable2
+    global pub_command
+    global loop_rate
 
     # Initialize ROS node
     rospy.init_node('lab5node')
@@ -416,13 +335,14 @@ def main():
      
 
 
-    move_arm(pub_command, loop_rate, home, vel, accel, 'J')  # Return to the home position
+    # move_arm(pub_command, loop_rate, home, vel, accel, 'J')  # Return to the home position
     turkey = cv2.imread("images/turkey.png")
     zigzag = cv2.imread("images/zigzag.jpg")
-    status= cv2.imread("images/status.png")
-    find_keypoints(status)
-    find_keypoints2(status)
-    # draw_image()
+    rob= cv2.imread("images/rob.png")
+    print("get data")
+    keypoints = find_keypoints2(rob)
+    # find_keypoints2(status)
+    draw_image(keypoints)
     
     rospy.loginfo("Task Completed!")
     print("Use Ctrl+C to exit program")
